@@ -1,157 +1,96 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert'; // Necessário para converter Lista para String JSON
+import 'course_data.dart'; // Importa nosso arquivo de dados
 
-// =========================================================================
-// MODELO (Classe Produto)
-// =========================================================================
-class Produto {
-  final String nome;
-  final int estoque;
-  final double preco;
-  final bool disponivel;
+void main() {
+  runApp(const CourseFinderApp());
+}
 
-  Produto({
-    required this.nome,
-    required this.estoque,
-    required this.preco,
-    required this.disponivel,
-  });
+class CourseFinderApp extends StatelessWidget {
+  const CourseFinderApp({super.key});
 
-  // Método para converter o objeto Produto em um Map (JSON)
-  Map<String, dynamic> toJson() => {
-        'nome': nome,
-        'estoque': estoque,
-        'preco': preco,
-        'disponivel': disponivel,
-      };
-
-  // Construtor de fábrica para criar um Produto a partir de um Map (JSON)
-  factory Produto.fromJson(Map<String, dynamic> json) {
-    return Produto(
-      nome: json['nome'] as String,
-      estoque: json['estoque'] as int,
-      preco: json['preco'] as double,
-      disponivel: json['disponivel'] as bool,
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Buscador de Cursos',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const CourseSearchScreen(),
     );
   }
 }
 
-// =========================================================================
-// WIDGET PRINCIPAL (StatefulWidget)
-// =========================================================================
-class ProductDetailPage extends StatefulWidget {
-  const ProductDetailPage({super.key});
+class CourseSearchScreen extends StatefulWidget {
+  const CourseSearchScreen({super.key});
 
   @override
-  State<ProductDetailPage> createState() => _ProductDetailPageState();
+  State<CourseSearchScreen> createState() => _CourseSearchScreenState();
 }
 
-class _ProductDetailPageState extends State<ProductDetailPage> {
-  List<Produto> listaProdutos = [];
-  bool isLoading = true;
+class _CourseSearchScreenState extends State<CourseSearchScreen> {
+  // Controlador para obter o texto do TextField
+  final TextEditingController _searchController = TextEditingController();
+  // Variável para armazenar o curso encontrado (pode ser nulo)
+  Course? _foundCourse;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProducts();
-  }
+  // Função chamada ao clicar no botão de busca
+  void _searchCourse() {
+    // Pega o texto do controlador e usa a função de busca
+    final String courseName = _searchController.text;
+    final Course? result = findCourseByName(courseName);
 
-  // Carrega os produtos do armazenamento local (LocalStorage no Web)
-  Future<void> _loadProducts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final productsString = prefs.getString('produtos_key');
-
-    if (productsString != null) {
-      final List<dynamic> jsonList = jsonDecode(productsString);
-      setState(() {
-        listaProdutos = jsonList.map((json) => Produto.fromJson(json)).toList();
-        isLoading = false;
-      });
-    } else {
-      // Se não houver dados salvos, usa dados iniciais (MOCK)
-      _useInitialData();
-    }
-  }
-  
-  // Dados iniciais (MOCK) - **CORREÇÃO: removido o 'const' aqui.**
-  void _useInitialData() {
-    listaProdutos = [ 
-      Produto(nome: "Notebook Pro X1", estoque: 42, preco: 3999.90, disponivel: true),
-      Produto(nome: "Mouse Gamer RGB", estoque: 150, preco: 129.90, disponivel: true),
-      Produto(nome: "Teclado Mecânico", estoque: 0, preco: 450.00, disponivel: false),
-    ];
-    _saveProducts(); // Salva os dados iniciais
+    // Atualiza o estado da tela com o curso encontrado
     setState(() {
-      isLoading = false;
+      _foundCourse = result;
     });
+
+    // Limpa o campo de busca (opcional)
+    _searchController.clear();
   }
 
-  // Salva a lista de produtos no armazenamento local
-  Future<void> _saveProducts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = listaProdutos.map((produto) => produto.toJson()).toList();
-    final productsString = jsonEncode(jsonList);
-    await prefs.setString('produtos_key', productsString);
-  }
-
-  // Constrói o widget de Card para um único produto
-  Widget _buildProductCard(Produto produto) {
+  // Widget para exibir os detalhes do curso
+  Widget _buildCourseDetails(Course course) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
-      ),
+      elevation: 4.0,
+      margin: const EdgeInsets.only(top: 20.0),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children: <Widget>[
             Text(
-              produto.nome,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.teal,
-              ),
+              'Curso Encontrado:',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const Divider(height: 15, thickness: 1),
-            _buildInfoRow('Estoque:', '${produto.estoque} unidades'),
-            _buildInfoRow('Preço:', 'R\$ ${produto.preco.toStringAsFixed(2)}'),
-            _buildInfoRow(
-              'Status:',
-              produto.disponivel ? 'Disponível' : 'Indisponível',
-              color: produto.disponivel ? Colors.green : Colors.red,
+            const Divider(),
+            _buildDetailRow('Nome:', course.name),
+            _buildDetailRow('Duração:', course.duration),
+            _buildDetailRow('Nível:', course.level),
+            const SizedBox(height: 10),
+            Text(
+              'Descrição:',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 5),
+            Text(course.description),
           ],
         ),
       ),
     );
   }
 
-  // Widget auxiliar para as linhas de informação
-  Widget _buildInfoRow(String label, String value, {Color color = Colors.black87}) {
+  // Widget auxiliar para as linhas de detalhe (Nome, Duração, etc.)
+  Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
-        children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
           Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
+            '$label ',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              color: color,
-            ),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
@@ -161,57 +100,62 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Catálogo de Produtos (Persistente)'),
-        backgroundColor: Colors.teal,
+        title: const Text('Buscador de Cursos'),
+        centerTitle: true,
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator()) 
-          : ListView.builder(
-              padding: const EdgeInsets.all(10.0),
-              itemCount: listaProdutos.length,
-              itemBuilder: (context, index) {
-                final produto = listaProdutos[index];
-                return _buildProductCard(produto);
-              },
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // 1. Campo para digitar o nome do curso
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Nome do Curso (ex: Desenvolvimento Web com Flutter)',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => _searchController.clear(),
+                ),
+              ),
+              onSubmitted: (_) => _searchCourse(), // Permite buscar ao pressionar Enter
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Adiciona um novo produto de exemplo e salva
-          setState(() {
-            listaProdutos.add(
-              Produto(nome: 'Novo Item Salvo ${listaProdutos.length}', estoque: 1, preco: 1.00, disponivel: true),
-            );
-          });
-          _saveProducts();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Novo produto adicionado e salvo localmente!')),
-          );
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.teal,
+            const SizedBox(height: 10),
+
+            // 2. Botão de busca
+            ElevatedButton.icon(
+              onPressed: _searchCourse,
+              icon: const Icon(Icons.search),
+              label: const Text('Buscar Curso'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            const Divider(),
+
+            // 3. Exibição dos resultados
+            Expanded(
+              child: SingleChildScrollView(
+                child: _foundCourse == null
+                    ? Center(
+                        child: Text(
+                          // Mensagem baseada no estado da busca
+                          _searchController.text.isEmpty && _foundCourse == null
+                              ? 'Digite o nome do curso para buscar.'
+                              : 'Curso não encontrado. Tente um nome exato, como "Desenvolvimento Web com Flutter".',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      )
+                    : _buildCourseDetails(_foundCourse!),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-}
-
-// =========================================================================
-// ARRANQUE DA APLICAÇÃO
-// =========================================================================
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Detalhes do Produto',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-      ),
-      home: const ProductDetailPage(),
     );
   }
 }

@@ -17,6 +17,7 @@ dependencies:
   
   # A dependência chave para o armazenamento local no navegador
   shared_preferences: ^2.2.2 
+  collection: ^1.19.1
 
 dev_dependencies:
   flutter_test:
